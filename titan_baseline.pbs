@@ -1,0 +1,75 @@
+#!/bin/bash
+#PBS -A csc160
+#PBS -N deeplearning
+#PBS -l walltime=2:00:00
+#PBS -l nodes=50
+#PBS -j oe
+#PBS -o output
+
+cd /lustre/atlas/proj-shared/csc160/rbpittma_tensor/ornl-ncsu-hyper-learning/ensemble_trainer;
+
+NUM_WORKER_NODES=50
+
+MODEL=alexnet_v2
+BATCH_SIZE=128
+# MODEL=inception_v1
+# BATCH_SIZE=32
+# MODEL=vgg_a
+# BATCH_SIZE=32
+
+NUM_STEPS=1000
+
+# Where the checkpoint and logs will be saved to.
+# Where the dataset is saved to.
+DATASET_DIR=/lustre/atlas/proj-shared/csc160/rbpittma_tensor/imagenet-data-lin
+
+module load singularity/2.4.0_legacy
+
+NUM_CORES=16;
+# for i in 2 5 10 15 20 25 30 35 40 45 50; do 
+# for i in 30 35 40 45 50; do 
+# for i in 45 50 55 60 65 70 75 80; do
+for i in 50; do
+    echo "===============RESET DATA COLLECTION===============";
+    echo "Version: Baseline"
+    echo Number of cores: $NUM_CORES
+    LOG_DIR=Logs/`date +%s`
+    mkdir $LOG_DIR
+    echo Timestamp: `date`
+    echo "Using log directory $LOG_DIR"
+    NUM_WORKER_NODES=$i;
+    echo "ENSEMBLE SIZE: $NUM_WORKER_NODES"
+    
+    aprun -d$NUM_CORES -n$NUM_WORKER_NODES -N1 singularity exec /lustre/atlas/proj-shared/csc160/rbpittma_tensor/tf_simple_hvd.img python3 multi_gpu_train.py \
+	--batch_size=$BATCH_SIZE \
+	--max_steps=$NUM_STEPS \
+	--dataset_dir=$DATASET_DIR \
+	--train_dir=$LOG_DIR \
+	--log_every_n_steps=10 \
+	--trace_every_n_steps=500 \
+	--save_summaries_steps=100 \
+	--model_name=$MODEL \
+	--cluster=titan \
+	--mode=train
+done
+
+# NUM_CORES=16;
+# echo Number of cores: $NUM_CORES
+# LOG_DIR=Logs/`date +%s`
+# mkdir $LOG_DIR
+# echo Timestamp: `date`
+# echo "Using log directory $LOG_DIR"
+
+# aprun -d$NUM_CORES -n$NUM_WORKER_NODES -N1 singularity exec /lustre/atlas/proj-shared/csc160/rbpittma_tensor/tf_simple_hvd.img python3 multi_gpu_train.py \
+#     --batch_size=$BATCH_SIZE \
+#     --max_steps=$NUM_STEPS \
+#     --dataset_dir=$DATASET_DIR \
+#     --train_dir=$LOG_DIR \
+#     --log_every_n_steps=1 \
+#     --trace_every_n_steps=2000 \
+#     --save_summaries_steps=25 \
+#     --model_name=$MODEL \
+#     --cluster=titan \
+#     --mode=train
+
+#PBS -lfeature=metered2

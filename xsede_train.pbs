@@ -1,0 +1,44 @@
+#!/bin/bash
+#SBATCH -N 1
+#SBATCH -p GPU
+#SBATCH -t 01:15:00
+#SBATCH --ntasks-per-node 1
+#SBATCH --gres=gpu:k80:4
+#SBATCH --no-requeue
+#SBATCH -A cc560rp
+#SBATCH -o output/slurm-%A.out
+#Got the default output format from:
+#    https://slurm.schedmd.com/sbatch.html
+
+echo Starting
+
+LOGDIR=Logs/`date +%s`
+mkdir $LOGDIR
+echo "Using log directory $LOGDIR"
+
+export  I_MPI_JOB_RESPECT_PROCESS_PLACEMENT=0
+module unload cuda
+module unload python2
+module unload tensorflow
+module load mpi/gcc_mvapich
+module load tensorflow/1.1.0
+
+source $TENSORFLOW_ENV/bin/activate;
+
+# %J is the job id number.
+cd /pylon5/cc560rp/rpittman/ornl-ncsu-hyper-learning/ensemble_trainer;
+#Need CUPTI for timelines in TF
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/packages/cuda/8.0/extras/CUPTI/lib64
+# module load singularity
+mpirun -np $SLURM_NNODES python multi_gpu_train.py \
+      --batch_size=128 \
+      --num_gpus=4 \
+      --max_steps=2000 \
+      --dataset_dir=/pylon5/cc560rp/rpittman/imagenet-data-lin \
+      --train_dir=$LOGDIR \
+      --log_every_n_steps=5 \
+      --trace_every_n_steps=900 \
+      --model_name=alexnet_v2 \
+      --cluster=xsede \
+      --mode="train" \
+      --save_summaries_steps=50

@@ -1,0 +1,24 @@
+#!/bin/bash
+#BSUB -W 0:20
+#BSUB -P csc160
+#BSUB -J deeplearning
+#BSUB -o output/summitdev.o%J
+#BSUB -nnodes 1
+
+# %J is the job id number.
+cd /lustre/atlas/proj-shared/csc160/rbpittma_tensor/ornl-ncsu-hyper-learning/ensemble_trainer
+LOGDIR=Logs/`date +%s`
+mkdir $LOGDIR
+echo "Using log directory $LOGDIR"
+
+# export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/extras/CUPTI/lib64
+module load singularity
+jsrun -n1 -a1 -c20 -g4 singularity exec --nv /lustre/atlas/world-shared/stf007/Tensorflow/tensorflow1.4_mpi.img python multi_gpu_train.py \
+      --batch_size=64 \
+      --num_gpus=4 \
+      --max_steps=500 \
+      --dataset_dir=/lustre/atlas/proj-shared/csc160/rbpittma_tensor/imagenet-data-lin \
+      --train_dir=$LOGDIR \
+      --log_every_n_steps=1 \
+      --trace_every_n_steps=40 \
+      --cluster=summit

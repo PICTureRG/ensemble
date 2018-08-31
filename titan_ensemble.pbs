@@ -1,0 +1,84 @@
+#!/bin/bash
+#PBS -A csc160
+#PBS -N deeplearning
+#PBS -l walltime=2:00:00
+#PBS -l nodes=50
+#PBS -j oe
+#PBS -o output
+
+# echo "Version: Optimized"
+# export OMP_NUM_THREADS=1
+# export TF_CPP_MIN_LOG_LEVEL=1; #Block TF logs
+
+cd /lustre/atlas/proj-shared/csc160/rbpittma_tensor/ornl-ncsu-hyper-learning/ensemble_trainer;
+#all_shared, single_bcast, multi_bcast
+ARCH=all_shared
+
+NUM_WORKER_NODES=50;
+NUM_PRE=5;
+
+MODEL=alexnet_v2
+BATCH_SIZE=128
+# MODEL=inception_v1
+# BATCH_SIZE=32
+# MODEL=vgg_a
+# BATCH_SIZE=32
+
+NUM_STEPS=1000;
+
+module load singularity/2.4.0_legacy
+SING_IMG_FILE=/lustre/atlas/proj-shared/csc160/rbpittma_tensor/tf_simple_hvd.img
+
+# Where the dataset is saved to.
+DATASET_DIR=/lustre/atlas/proj-shared/csc160/rbpittma_tensor/imagenet-data-lin
+
+if [ $ARCH != "all_shared" ]; then
+    # Any non-all_shared implementation requires "Horovod Groups"
+    echo "Activating Horovod Groups implementation"
+    export PYTHONPATH=/lustre/atlas/proj-shared/csc160/rbpittma_tensor/hvd_install/lib/python3.5/site-packages
+    export MPICH_MAX_THREAD_SAFETY=multiple #CRUCIAL: Must be able to use multiple mpi thread setting, will not work without this!
+else
+    export PYTHONPATH=;
+    export MPICH_MAX_THREAD_SAFETY=;
+fi
+
+# echo "ENSEMBLE SIZE: $i";
+# NUM_WORKER_NODES=$i;
+# echo "NUM_PRE: $NUM_PRE";
+# for i in 2 5 10 15 20 25 30 35 40 45 50; do 
+# for i in 10 15 20 25 30 35 40 45 50; do 
+# 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140 145 150; do
+# for i in 25 30 35 40 45 50; do
+# for i in 60 65 70 75 80; do
+# for i in 2 5 10 15 20 25 30 35 40 45 50; do 
+for i in 50; do 
+    echo "===============RESET DATA COLLECTION===============";
+    echo "Version: $ARCH"
+    NUM_WORKER_NODES=$i;
+    echo "ENSEMBLE SIZE: $NUM_WORKER_NODES"
+    echo "NUM_PRE: $NUM_PRE"
+    NUM_CORES=16;
+    echo Number of cores: $NUM_CORES
+    LOG_DIR=Logs/`date +%s`
+    mkdir $LOG_DIR
+    echo Timestamp: `date`
+    echo "Using log directory $LOG_DIR"
+    
+    aprun -d$NUM_CORES -n$NUM_WORKER_NODES -N1 singularity exec $SING_IMG_FILE python3 ensemble.py \
+	--batch_size=$BATCH_SIZE \
+	--max_steps=$NUM_STEPS \
+	--dataset_dir=$DATASET_DIR \
+	--train_dir=$LOG_DIR \
+	--log_every_n_steps=10 \
+	--trace_every_n_steps=500 \
+	--save_summaries_steps=100 \
+	--model_name=$MODEL \
+	--cluster=titan \
+	--num_pre=$NUM_PRE \
+	--num_workers=$NUM_WORKER_NODES \
+	--mode=train \
+	--arch=$ARCH
+done
+
+# Used this line for power collection on cabinet C22-0
+#PBS -lfeature=metered2
